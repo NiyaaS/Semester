@@ -11,7 +11,7 @@ import { addDays, getDateRangeArray, isInDateRangeArray } from 'office-ui-fabric
 import { Dropdown, DropdownMenuItemType, IDropdownStyles, IDropdownOption } from 'office-ui-fabric-react/lib/Dropdown';
 import { PeoplePicker, PrincipalType } from "@pnp/spfx-controls-react/lib/PeoplePicker";
 import { DetailsList, DetailsListLayoutMode, Selection, IColumn } from 'office-ui-fabric-react/lib/DetailsList';
-import { DatePicker, IDatePickerStrings } from 'office-ui-fabric-react/lib/DatePicker';
+import { DatePicker } from 'office-ui-fabric-react/lib/DatePicker';
 import { Calendar, DayOfWeek, DateRangeType } from 'office-ui-fabric-react/lib/Calendar';
 import { Dialog, DialogType, DialogFooter } from 'office-ui-fabric-react/lib/Dialog';
 
