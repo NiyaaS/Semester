@@ -1,0 +1,19 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "bokningar-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/bokningar/BokningarWebPart.js",
+          "manifest": "./src/webparts/bokningar/BokningarWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {
+    "BokningarWebPartStrings": "lib/webparts/bokningar/loc/{locale}.js",
+    "ControlStrings": "node_modules/@pnp/spfx-controls-react/lib/loc/{locale}.js"
+  }
+}
