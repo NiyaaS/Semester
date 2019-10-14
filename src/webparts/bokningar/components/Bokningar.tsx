@@ -14,6 +14,7 @@ import { DetailsList, DetailsListLayoutMode, Selection, IColumn } from 'office-u
 import { DatePicker } from 'office-ui-fabric-react/lib/DatePicker';
 import { Calendar, DayOfWeek, DateRangeType } from 'office-ui-fabric-react/lib/Calendar';
 import { Dialog, DialogType, DialogFooter } from 'office-ui-fabric-react/lib/Dialog';
+import { MessageBarButton, Link, Stack, StackItem, MessageBar, MessageBarType, ChoiceGroup, IStackProps } from 'office-ui-fabric-react';
 
 
 const DayPickerStrings = {
@@ -51,6 +52,7 @@ export interface IBokningarState {
   _buttonString: string;
   CurrentUserId: number;
   hideDialog: boolean;
+  error: boolean;
 }
 
 export default class Bokningar extends React.Component<IBokningarProps, IBokningarState> {
@@ -84,6 +86,7 @@ export default class Bokningar extends React.Component<IBokningarProps, IBokning
       _buttonString: 'Välj Slut Datum',
       CurrentUserId: null,
       hideDialog: true,
+      error: false,
     };
 
     this._columns = [
@@ -92,9 +95,9 @@ export default class Bokningar extends React.Component<IBokningarProps, IBokning
       { key: 'column2', name: 'Slut Datum', fieldName: 'SlutDatum', minWidth: 60, maxWidth: 80, isResizable: false, onRender: (item) => <span>{item.SlutDatum.slice(0, 10)}</span> },
       { key: 'column2', name: 'Status', fieldName: 'Status', minWidth: 50, maxWidth: 60, isResizable: false },
       { key: 'column2', name: 'Ansvarig', fieldName: 'Ansvarig', minWidth: 100, maxWidth: 200, isResizable: true, onRender: (item) => <span>{item.Ansvarig.Title}</span> },
-      { key: 'column6', name: '', minWidth: 20, maxWidth: 50, isResizable: false, onRender: (item) => item.Status === "Skapad" || item.Status ==='Behandlas' ? <IconButton iconProps={{ iconName: 'Delete', }} title="Delete" ariaLabel="Delete" onClick={() => { this.deleteBookings(item.Id) }} /> : null },
-      { key: 'column7', name: '', minWidth: 20, maxWidth: 50, isResizable: false, onRender: (item) => this.state.IsAdmin === false && ( item.Status === "Skapad" || item.Status ==='Behandlas') ? <IconButton iconProps={{ iconName: 'Sync' }} title="Uppdatera" ariaLabel="Uppdatera" onClick={() => { this.showPanelUppdate(item) }} /> : null },
-      { key: 'column8', name: '', minWidth: 20, maxWidth: 50, isResizable: false, onRender: (item) => this.state.IsAdmin === true && (item.Status === "Skapad" || item.Status ==='Behandlas') ? <IconButton iconProps={{ iconName: 'Edit', }} title="Ändra Status" ariaLabel="Ändra Status" onClick={() => { this._showDialog(item.Id) }} /> : null },
+      { key: 'column6', name: '', minWidth: 20, maxWidth: 50, isResizable: false, onRender: (item) => item.Status === "Skapad" || item.Status === 'Behandlas' ? <IconButton iconProps={{ iconName: 'Delete', }} title="Delete" ariaLabel="Delete" onClick={() => { this.deleteBookings(item.Id) }} /> : null },
+      { key: 'column7', name: '', minWidth: 20, maxWidth: 50, isResizable: false, onRender: (item) => this.state.IsAdmin === false && (item.Status === "Skapad" || item.Status === 'Behandlas') ? <IconButton iconProps={{ iconName: 'Sync' }} title="Uppdatera" ariaLabel="Uppdatera" onClick={() => { this.showPanelUppdate(item) }} /> : null },
+      { key: 'column8', name: '', minWidth: 20, maxWidth: 50, isResizable: false, onRender: (item) => this.state.IsAdmin === true && (item.Status === "Skapad" || item.Status === 'Behandlas') ? <IconButton iconProps={{ iconName: 'Edit', }} title="Ändra Status" ariaLabel="Ändra Status" onClick={() => { this._showDialog(item.Id) }} /> : null },
     ];
 
     this.options = [
@@ -105,7 +108,7 @@ export default class Bokningar extends React.Component<IBokningarProps, IBokning
     ];
   }
 
-  private _showDialog = (Id?:number): void => {
+  private _showDialog = (Id?: number): void => {
     this.setState({
       hideDialog: false,
       itemId: Id
@@ -117,7 +120,7 @@ export default class Bokningar extends React.Component<IBokningarProps, IBokning
       hideDialog: true,
     });
   }
-  
+
   public componentDidMount() {
     this.getBookings();
   }
@@ -135,56 +138,63 @@ export default class Bokningar extends React.Component<IBokningarProps, IBokning
 
   private addBooking = async (e: any) => {
     e.preventDefault();
-  
-    await sp.web.lists.getByTitle("Bookings").items.add({
-      Title: this.state.Title,
-      StartDatum: new Date(this.state.StartDatum.setHours(8)),
-      SlutDatum: new Date(this.state.SlutDatum.setHours(17)),
-      AnsvarigId: this.state.AnsvarigId
-    })
-    this.getBookings();
-    this.hidePanel();
+    let testDatum = this.getDatesInbetween(this.state.StartDatum.toISOString(), this.state.SlutDatum.toISOString());
+    let findDatum = testDatum.some(x => { return isInDateRangeArray(x, this.state.ResDatum) === true });
+
+    if (findDatum === false) {
+      await sp.web.lists.getByTitle("Bookings").items.add({
+        Title: this.state.Title,
+        StartDatum: new Date(this.state.StartDatum.setHours(8)),
+        SlutDatum: new Date(this.state.SlutDatum.setHours(17)),
+        AnsvarigId: this.state.AnsvarigId,
+      })
+      this.getBookings();
+      this.hidePanel();
+    } else {
+      this.setState({ error: true })
+    }
   }
 
   public getDatesInbetween = (StartDatum: string, SlutDatum: string) => {
     let currentDate = new Date(StartDatum);
     var resDates: Date[] = new Array();
-    while(currentDate <= new Date(SlutDatum)){
-        resDates.push(currentDate);
-        currentDate = addDays(currentDate, +1);
+    while (currentDate <= new Date(SlutDatum)) {
+      resDates.push(currentDate);
+      currentDate = addDays(currentDate, +1);
     }
     return resDates;
   }
 
-  private getBookings = async (today: Date = new Date()) => {
+  private getBookings = async () => {
     // console.log(today);
     await sp.web.currentUser.get()
-    .then((user: CurrentUser) => {
-      //console.log(user);
-      this.setState({
-        CurrentUserId: user['Id'],
-        Title: user['Title'],
-        IsAdmin: user['IsSiteAdmin']
-      });
-    sp.web.lists.getByTitle('Bookings').items.select('*', 'Ansvarig/Title', 'Ansvarig/Id').expand('Ansvarig').get()
-      .then((result: any) => {
-        //console.log(result);
-        let semesterBak: any = result.filter(x => Date.parse(x.StartDatum) >= Date.now().valueOf());
-        //let allaBokadeDatum: Date[] = result.map([].concat(...result.map(f => this.getDatesInbetween(f.StartDatum, f.SlutDatum))));
-        // let resDateUser: any = result.filter(x => x.AuthorId === this.state.CurrentUserId)
-        
+      .then((user: CurrentUser) => {
+        //console.log(user);
         this.setState({
-          items: semesterBak,
-          ItemsHolder: result,
-          ResDatum:[].concat(...result.filter(x => x.AuthorId === this.state.CurrentUserId && new Date(x.StartDatum) > new Date()).map(f => this.getDatesInbetween(f.StartDatum, f.SlutDatum)))
+          CurrentUserId: user['Id'],
+          Title: user['Title'],
+          IsAdmin: user['IsSiteAdmin']
         });
-      })//.then(() => {console.log(this.state.ResDatum)})
-    }); 
-      // console.log(this.state.ResDatum);
+        sp.web.lists.getByTitle('Bookings').items.select('*', 'Ansvarig/Title', 'Ansvarig/Id').expand('Ansvarig').get()
+          .then((result: any) => {
+            //console.log(result);
+            let semesterBak: any = result.filter(x => Date.parse(x.StartDatum) >= Date.now().valueOf());
+            
+            this.setState({
+              items: semesterBak,
+              ItemsHolder: result,
+              ResDatum: [].concat(...result.filter(x => x.AuthorId === this.state.CurrentUserId && new Date(x.StartDatum) > new Date()).map(f => this.getDatesInbetween(f.StartDatum, f.SlutDatum)))
+            });
+          })
+      });
+ 
   }
 
   private uppdateBooking = (id: number): void => {
     //console.log(id);
+    let testDatum = this.getDatesInbetween(this.state.StartDatum.toISOString(), this.state.SlutDatum.toISOString());
+    let findDatum = testDatum.some(x => { return isInDateRangeArray(x, this.state.ResDatum) === true });
+    if (findDatum === false) {
     sp.web.lists.getByTitle('Bookings').items.getById(id).update({
       StartDatum: new Date(this.state.StartDatum.setHours(8)),
       SlutDatum: new Date(this.state.SlutDatum.setHours(17)),
@@ -192,6 +202,9 @@ export default class Bokningar extends React.Component<IBokningarProps, IBokning
       this.getBookings();
       this.hidePanel();
     });
+    }else{
+      this.setState({ error: true })
+    }
   }
 
   private uppdateStatus = (id: number): void => {
@@ -220,8 +233,7 @@ export default class Bokningar extends React.Component<IBokningarProps, IBokning
   }
 
   private showPanelUppdate = (item: any): void => {
-    this.getBookings(new Date(item.StartDatum));
-    //console.log(item.StartDatum.toLocaleDateString());
+    
     console.log(item);
     this.setState({
       showPanel: true,
@@ -238,6 +250,7 @@ export default class Bokningar extends React.Component<IBokningarProps, IBokning
       SlutDatum: null,
       itemId: null,
       AnsvarigId: '',
+      error: false,
     });
   }
 
@@ -249,9 +262,7 @@ export default class Bokningar extends React.Component<IBokningarProps, IBokning
   }
 
   private onSelectStartDate = (date: Date): void => {
-    let isInRange = isInDateRangeArray(addDays(date, +1), this.state.ResDatum);
-    //let dateRange = getDateRangeArray(this.state.StartDatum, DateRangeType, Date[])
-    console.log(isInRange);
+
     this.setState({
       StartDatum: date,
       showStartCalendar: false,
@@ -259,10 +270,7 @@ export default class Bokningar extends React.Component<IBokningarProps, IBokning
   }
 
   private onSelectSlutDate = (date: Date): void => {
-    //let testDatum = this.getDatesInbetween(this.state.StartDatum.toISOString(), date.toISOString());
-    //let findDatum =  testDatum.map(x => {return isInDateRangeArray(x, this.state.ResDatum)});
-    //let ifDatumContain = findDatum.map(x => )
-    
+
     this.setState({
       SlutDatum: date,
       showSlutCalendar: false,
@@ -288,30 +296,30 @@ export default class Bokningar extends React.Component<IBokningarProps, IBokning
 
   public render(): React.ReactElement<IBokningarProps> {
 
-    let filterPerson: any[] = this.state.IsAdmin === true ? this.state.items.filter(x => x.AnsvarigId === this.state.CurrentUserId):
-    this.state.items.filter(x => x.AuthorId === this.state.CurrentUserId);
+    let filterPerson: any[] = this.state.IsAdmin === true ? this.state.items.filter(x => x.AnsvarigId === this.state.CurrentUserId) :
+      this.state.items.filter(x => x.AuthorId === this.state.CurrentUserId);
 
-    let showButtons: JSX.Element = this.state.itemId !== null ? 
-    <PrimaryButton text="Uppdatera" type="submit" onClick={() => { this.uppdateBooking(this.state.itemId) }} />
-    :<div>
-      <PeoplePicker
-      context={this.props.context}
-      titleText="Ansvarig"
-      personSelectionLimit={1}
-      groupName={"semester Owners"}
-      showtooltip={true}
-      isRequired={true}
-      disabled={false}
-      selectedItems={this.getPeoplePickerItems}
-      showHiddenInUI={false}
-      principalTypes={[PrincipalType.User]}
-      ensureUser={true}
-      resolveDelay={1000}
-    />
-    <PrimaryButton text="Ansök" type="submit" onClick={this.addBooking} disabled={this.state.StartDatum === null || this.state.SlutDatum === null || this.state.AnsvarigId === '' ? true:false }/>
-    </div> 
-    
- 
+    let showButtons: JSX.Element = this.state.itemId !== null ?
+      <PrimaryButton text="Uppdatera" type="submit" onClick={() => { this.uppdateBooking(this.state.itemId) }} />
+      : <div>
+        <PeoplePicker
+          context={this.props.context}
+          titleText="Ansvarig"
+          personSelectionLimit={1}
+          groupName={"semester Owners"}
+          showtooltip={true}
+          isRequired={true}
+          disabled={false}
+          selectedItems={this.getPeoplePickerItems}
+          showHiddenInUI={false}
+          principalTypes={[PrincipalType.User]}
+          ensureUser={true}
+          resolveDelay={1000}
+        />
+        <PrimaryButton text="Ansök" type="submit" onClick={this.addBooking} disabled={this.state.StartDatum === null || this.state.SlutDatum === null || this.state.AnsvarigId === '' ? true : false} />
+      </div>
+
+
 
     return (
       <div className={styles.bokningar}>
@@ -342,8 +350,7 @@ export default class Bokningar extends React.Component<IBokningarProps, IBokning
             type: DialogType.largeHeader,
             title: 'Välj Status',
           }}
-          modalProps={{ isBlocking: false, styles: { main: { maxWidth: 450 } } }}
-        >
+          modalProps={{ isBlocking: false, styles: { main: { maxWidth: 450 } } }}>
           <Dropdown
             placeholder="Välj Status"
             label="Status"
@@ -358,6 +365,7 @@ export default class Bokningar extends React.Component<IBokningarProps, IBokning
         </Dialog>
 
         <form>
+
           <Panel
             isOpen={this.state.showPanel}
             closeButtonAriaLabel="Close"
@@ -366,6 +374,10 @@ export default class Bokningar extends React.Component<IBokningarProps, IBokning
             onDismiss={this.hidePanel}
           >
             <div>
+              {(this.state.error && <MessageBar messageBarType={MessageBarType.error} isMultiline={false} dismissButtonAriaLabel="Close">
+                Du valde datum som överlappar redan ansökt semester.
+              </MessageBar>)}
+
               <div ref={calendarBtn => (this._calendarButtonElement = calendarBtn!)}>
                 <DefaultButton
                   onClick={this.onClickDate}
@@ -381,9 +393,7 @@ export default class Bokningar extends React.Component<IBokningarProps, IBokning
                   restrictedDates={this.state.ResDatum}
                   minDate={new Date()}
                 />
-
               )}<br />
-
               <div ref={calendarBtn => (this.calendarButtonElement = calendarBtn!)}>
                 <DefaultButton
                   onClick={this._onClickDate}
